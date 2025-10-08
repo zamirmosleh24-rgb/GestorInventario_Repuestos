@@ -6,7 +6,12 @@ on:
       - main
   workflow_dispatch:
 
+# 🔑 Permitir al workflow crear releases y subir artefactos
+permissions:
+  contents: write
+
 jobs:
+  # 🏗️ Compila los instaladores para ambas arquitecturas
   build:
     runs-on: windows-latest
 
@@ -24,14 +29,11 @@ jobs:
         python-version: '3.8'
         architecture: ${{ matrix.arch }}
 
-    - name: Install PyInstaller
-      run: pip install pyinstaller
-
-    - name: Install client requirements
-      run: pip install -r requirements-client.txt
-
-    - name: Install server requirements
-      run: pip install -r requirements-server.txt
+    - name: Install dependencies
+      run: |
+        pip install pyinstaller
+        pip install -r requirements-client.txt
+        pip install -r requirements-server.txt
 
     - name: Build Client
       run: pyinstaller --onefile --noconsole Cliente/client_app.py --name Cliente_${{ matrix.arch }}
@@ -39,17 +41,30 @@ jobs:
     - name: Build Server
       run: pyinstaller --onefile --noconsole Servidor/server.py --name Servidor_${{ matrix.arch }}
 
-    - name: Upload installers
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: installers-${{ matrix.arch }}
         path: dist/*
 
-    - name: Create Release
+  # 🚀 Crea la release y adjunta los ejecutables de ambas arquitecturas
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./dist
+
+    - name: List downloaded files
+      run: ls -R ./dist
+
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v1.0.${{ github.run_number }}
         name: "Gestor Inventario Repuestos v1.0.${{ github.run_number }}"
-        files: dist/*
+        files: ./dist/**/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
